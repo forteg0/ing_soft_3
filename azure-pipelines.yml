@@ -6,9 +6,6 @@ trigger:
 # ========================
 pool:
   name: Default   # Tu agente local registrado en Azure DevOps
-  demands:
-    - agent.name -equals $(Agent.Name)
-
 variables:
   buildConfiguration: 'Release'
 
