@@ -2,58 +2,66 @@ using EmployeeCrudApi.Data;
 using EmployeeCrudApi.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace EmployeeCrudApi.Controllers
 {
-    [Route("api/[controller]/[action]")]
     [ApiController]
+    [Route("api/[controller]")]
     public class EmployeeController : ControllerBase
     {
-        private ApplicationDbContext _context;
+        private readonly ApplicationDbContext _context;
 
         public EmployeeController(ApplicationDbContext context)
         {
             _context = context;
         }
 
-        [HttpGet]
+        [HttpGet("getall")]
         public async Task<List<Employee>> GetAll()
         {
             return await _context.Employees.ToListAsync();
         }
 
-        [HttpGet]
-        public async Task<Employee> GetById(int id)
+        [HttpGet("getbyid")]
+        public async Task<ActionResult<Employee>> GetById(int id)
         {
-            return await _context.Employees.FindAsync(id);
+            var employee = await _context.Employees.FindAsync(id);
+            if (employee == null)
+                return NotFound();
+            return employee;
         }
 
-        [HttpPost]
-        public async Task Create([FromBody] Employee employee)
+        [HttpPost("create")]
+        public async Task<IActionResult> Create([FromBody] Employee employee)
         {
-            employee.CreatedDate = DateTime.Now;
-            await _context.Employees.AddAsync(employee);
+            _context.Employees.Add(employee);
             await _context.SaveChangesAsync();
+            return Ok();
         }
 
-        [HttpPut]
-        public async Task Update([FromBody] Employee employee)
+        [HttpPut("update")]
+        public async Task<IActionResult> Update([FromBody] Employee employee)
         {
-            Employee employeeToUpdate = await _context.Employees.FindAsync(employee.Id);
-            employeeToUpdate.Name = employee.Name;
+            var existing = await _context.Employees.FindAsync(employee.Id);
+            if (existing == null)
+                return NotFound();
+
+            existing.Name = employee.Name;
+            _context.Employees.Update(existing);
             await _context.SaveChangesAsync();
+            return Ok();
         }
 
-        [HttpDelete]
-        public async Task Delete(int id)
+        [HttpDelete("delete")]
+        public async Task<IActionResult> Delete(int id)
         {
-            var employeeToDelete = await _context.Employees.FindAsync(id);
-            _context.Remove(employeeToDelete);
+            var employee = await _context.Employees.FindAsync(id);
+            if (employee == null)
+                return NotFound();
+
+            _context.Employees.Remove(employee);
             await _context.SaveChangesAsync();
+            return Ok();
         }
     }
 }
