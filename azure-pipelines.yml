@@ -21,6 +21,8 @@ stages:
         displayName: "Build & Test .NET Backend"
         steps:
 
+          - checkout: self
+
           - task: UseDotNet@2
             displayName: "Install .NET SDK 8"
             inputs:
