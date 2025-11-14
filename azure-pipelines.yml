@@ -1,17 +1,22 @@
 trigger:
   - main
 
+# ========================
+#  AGENTE LOCAL (SELF-HOSTED)
+# ========================
 pool:
-  vmImage: 'ubuntu-latest'
+  name: Default   # Tu agente local registrado en Azure DevOps
+  demands:
+    - agent.name -equals $(Agent.Name)
 
 variables:
   buildConfiguration: 'Release'
 
 stages:
 
-  # ---------------------------
-  # BACKEND (.NET)
-  # ---------------------------
+  # ========================
+  # BACKEND (.NET 8)
+  # ========================
   - stage: Backend
     displayName: "Backend Build & Tests"
     jobs:
@@ -20,45 +25,47 @@ stages:
         steps:
 
           - task: UseDotNet@2
+            displayName: "Install .NET SDK 8"
             inputs:
               packageType: 'sdk'
               version: '8.x'
-            displayName: "Install .NET SDK 8"
 
+          # Restore (usamos la solución!)
           - script: |
-              cd backend
-              dotnet restore
-            displayName: "Restore backend"
+              dotnet restore EmployeeCrudApi.sln
+            displayName: "Restore .NET solution"
 
+          # Build
           - script: |
-              cd backend
-              dotnet build --configuration $(buildConfiguration)
-            displayName: "Build backend"
+              dotnet build EmployeeCrudApi.sln --configuration $(buildConfiguration)
+            displayName: "Build .NET solution"
 
+          # Run tests (unit + integration si tenés)
           - script: |
-              cd backend
-              dotnet test --configuration $(buildConfiguration) --logger "trx"
-            displayName: "Run backend unit tests"
+              dotnet test EmployeeCrudApi.sln --configuration $(buildConfiguration) --logger "trx"
+            displayName: "Run backend tests"
 
           - task: PublishTestResults@2
+            displayName: "Publish .NET test results"
             inputs:
               testResultsFormat: VSTest
               testResultsFiles: '**/*.trx'
-            displayName: "Publish backend test results"
+              failTaskOnFailedTests: true
 
 
-  # ---------------------------
+  # ========================
   # FRONTEND (ANGULAR)
-  # ---------------------------
+  # ========================
   - stage: Frontend
     displayName: "Frontend Build & Tests"
     dependsOn: Backend
     jobs:
+
       - job: BuildAndTestFrontend
         displayName: "Build & Test Angular Frontend"
         steps:
 
-          # Cache de node_modules
+          # Cache para node_modules
           - task: Cache@2
             inputs:
               key: 'npm | "$(Agent.OS)" | frontend/package-lock.json'
@@ -75,21 +82,23 @@ stages:
           - script: |
               cd frontend
               npm install
-            displayName: "Install frontend deps"
+            displayName: "Install Angular dependencies"
 
+          # Ejecutar tests con Karma + Jasmine + ChromeHeadless
           - script: |
               cd frontend
-              npm run test -- --watch=false --browsers=ChromeHeadless --code-coverage
-            displayName: "Run Angular unit tests (Karma + Jasmine)"
+              npm run test -- --watch=false --browsers=ChromeHeadless --code-coverage --progress=false --no-sandbox
+            displayName: "Run Angular tests"
 
+          # Publicar resultados si usás junit reporter
           - task: PublishTestResults@2
+            displayName: "Publish Angular test results"
             inputs:
               testResultsFormat: JUnit
               testResultsFiles: 'frontend/test-results/junit/*.xml'
               failTaskOnFailedTests: true
-            displayName: "Publish frontend test results"
 
           - script: |
               cd frontend
               npm run build
-            displayName: "Build frontend"
+            displayName: "Build Angular project"
