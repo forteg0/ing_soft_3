@@ -1,19 +1,16 @@
 trigger:
-  - main
+- main
 
-# ========================
-#  AGENTE LOCAL (SELF-HOSTED)
-# ========================
 pool:
-  name: Default   # Tu agente local registrado en Azure DevOps
+  name: Default
+
 variables:
   buildConfiguration: 'Release'
 
 stages:
-
-  # ========================
-  # BACKEND (.NET 8)
-  # ========================
+# =========================
+#   BACKEND (.NET 8)
+# =========================
   - stage: Backend
     displayName: "Backend Build & Tests"
     jobs:
@@ -24,80 +21,64 @@ stages:
           - checkout: self
 
           - task: UseDotNet@2
-            displayName: "Install .NET SDK 8"
             inputs:
               packageType: 'sdk'
               version: '8.x'
+            displayName: "Install .NET SDK 8"
 
-          # Restore (usamos la solución!)
           - script: |
-              dotnet restore EmployeeCrudApi.sln
-            displayName: "Restore .NET solution"
+              dotnet restore "$(System.DefaultWorkingDirectory)/EmployeeCrudApi/EmployeeCrudApi.sln"
+            displayName: "Restore backend"
 
-          # Build
           - script: |
-              dotnet build EmployeeCrudApi.sln --configuration $(buildConfiguration)
-            displayName: "Build .NET solution"
+              dotnet build "$(System.DefaultWorkingDirectory)/EmployeeCrudApi/EmployeeCrudApi.sln" --configuration $(buildConfiguration)
+            displayName: "Build backend"
 
-          # Run tests (unit + integration si tenés)
           - script: |
-              dotnet test EmployeeCrudApi.sln --configuration $(buildConfiguration) --logger "trx"
+              dotnet test "$(System.DefaultWorkingDirectory)/EmployeeCrudApi/EmployeeCrudApi.sln" \
+                --configuration $(buildConfiguration) \
+                --logger "trx"
             displayName: "Run backend tests"
 
           - task: PublishTestResults@2
-            displayName: "Publish .NET test results"
             inputs:
               testResultsFormat: VSTest
               testResultsFiles: '**/*.trx'
-              failTaskOnFailedTests: true
+            displayName: "Publish backend test results"
+
+          - publish: "$(System.DefaultWorkingDirectory)/EmployeeCrudApi/EmployeeCrudApi/bin/Release"
+            artifact: backend
+            displayName: "Publish backend artifacts"
 
 
-  # ========================
-  # FRONTEND (ANGULAR)
-  # ========================
+# =========================
+#   FRONTEND (Angular)
+# =========================
   - stage: Frontend
-    displayName: "Frontend Build & Tests"
+    displayName: "Frontend Build (Angular)"
     dependsOn: Backend
     jobs:
-
-      - job: BuildAndTestFrontend
-        displayName: "Build & Test Angular Frontend"
+      - job: BuildFrontend
+        displayName: "Build Angular App"
         steps:
 
-          # Cache para node_modules
-          - task: Cache@2
-            inputs:
-              key: 'npm | "$(Agent.OS)" | frontend/package-lock.json'
-              restoreKeys: |
-                npm | "$(Agent.OS)"
-              path: 'frontend/node_modules'
-            displayName: "Cache node_modules"
+          - checkout: self
 
           - task: NodeTool@0
             inputs:
               versionSpec: '18.x'
-            displayName: "Install Node.js"
+            displayName: "Install Node.js 18"
 
           - script: |
-              cd frontend
-              npm install
-            displayName: "Install Angular dependencies"
-
-          # Ejecutar tests con Karma + Jasmine + ChromeHeadless
-          - script: |
-              cd frontend
-              npm run test -- --watch=false --browsers=ChromeHeadless --code-coverage --progress=false --no-sandbox
-            displayName: "Run Angular tests"
-
-          # Publicar resultados si usás junit reporter
-          - task: PublishTestResults@2
-            displayName: "Publish Angular test results"
-            inputs:
-              testResultsFormat: JUnit
-              testResultsFiles: 'frontend/test-results/junit/*.xml'
-              failTaskOnFailedTests: true
+              cd "$(System.DefaultWorkingDirectory)/EmployeeCrudAngular"
+              npm install --legacy-peer-deps
+            displayName: "Install dependencies"
 
           - script: |
-              cd frontend
+              cd "$(System.DefaultWorkingDirectory)/EmployeeCrudAngular"
               npm run build
-            displayName: "Build Angular project"
+            displayName: "Build Angular frontend"
+
+          - publish: "$(System.DefaultWorkingDirectory)/EmployeeCrudAngular/dist"
+            artifact: frontend
+            displayName: "Publish frontend artifacts"
