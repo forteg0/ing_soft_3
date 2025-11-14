@@ -1,0 +1,95 @@
+trigger:
+  - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  buildConfiguration: 'Release'
+
+stages:
+
+  # ---------------------------
+  # BACKEND (.NET)
+  # ---------------------------
+  - stage: Backend
+    displayName: "Backend Build & Tests"
+    jobs:
+      - job: BuildAndTestBackend
+        displayName: "Build & Test .NET Backend"
+        steps:
+
+          - task: UseDotNet@2
+            inputs:
+              packageType: 'sdk'
+              version: '8.x'
+            displayName: "Install .NET SDK 8"
+
+          - script: |
+              cd backend
+              dotnet restore
+            displayName: "Restore backend"
+
+          - script: |
+              cd backend
+              dotnet build --configuration $(buildConfiguration)
+            displayName: "Build backend"
+
+          - script: |
+              cd backend
+              dotnet test --configuration $(buildConfiguration) --logger "trx"
+            displayName: "Run backend unit tests"
+
+          - task: PublishTestResults@2
+            inputs:
+              testResultsFormat: VSTest
+              testResultsFiles: '**/*.trx'
+            displayName: "Publish backend test results"
+
+
+  # ---------------------------
+  # FRONTEND (ANGULAR)
+  # ---------------------------
+  - stage: Frontend
+    displayName: "Frontend Build & Tests"
+    dependsOn: Backend
+    jobs:
+      - job: BuildAndTestFrontend
+        displayName: "Build & Test Angular Frontend"
+        steps:
+
+          # Cache de node_modules
+          - task: Cache@2
+            inputs:
+              key: 'npm | "$(Agent.OS)" | frontend/package-lock.json'
+              restoreKeys: |
+                npm | "$(Agent.OS)"
+              path: 'frontend/node_modules'
+            displayName: "Cache node_modules"
+
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '18.x'
+            displayName: "Install Node.js"
+
+          - script: |
+              cd frontend
+              npm install
+            displayName: "Install frontend deps"
+
+          - script: |
+              cd frontend
+              npm run test -- --watch=false --browsers=ChromeHeadless --code-coverage
+            displayName: "Run Angular unit tests (Karma + Jasmine)"
+
+          - task: PublishTestResults@2
+            inputs:
+              testResultsFormat: JUnit
+              testResultsFiles: 'frontend/test-results/junit/*.xml'
+              failTaskOnFailedTests: true
+            displayName: "Publish frontend test results"
+
+          - script: |
+              cd frontend
+              npm run build
+            displayName: "Build frontend"

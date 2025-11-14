@@ -16,23 +16,22 @@ export class EmployeeService {
   constructor(private http: HttpClient, private datepipe: DatePipe) {}
 
   getAllEmployee(): Observable<Employee[]> {
-    return this.http
-      .get<Employee[]>(this.apiUrlEmployee + '/getall')
-      .pipe(
-        map((data: Employee[]) =>
-          data.map(
-            (item: Employee) =>
-              new Employee(
-                item.id,
-                item.name,
-                this.datepipe
-                  .transform(item.createdDate, 'dd/MM/yyyy HH:mm:ss',undefined)
-                  ?.toString()
-              )
-          )
+  return this.http
+    .get<Employee[]>(this.apiUrlEmployee + '/getall')
+    .pipe(
+      map((data: Employee[]) =>
+        data.map(
+          (item: Employee) =>
+            new Employee(
+              item.id,
+              item.name,
+              item.createdDate  // ← No tocar la fecha
+            )
         )
-      );
-  }
+      )
+    );
+}
+
 
 
   getEmployeeById(employeeId: number): Observable<Employee> {
